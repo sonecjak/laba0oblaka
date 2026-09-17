@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Лаба 0 — заметки</title>
+  <style>
+    body { font-family: sans-serif; max-width: 500px; margin: 40px auto; }
+    input { padding: 8px; width: 70%; }
+    button { padding: 8px 16px; }
+    ul { padding-left: 20px; }
+  </style>
+</head>
+<body>
+  <h1>Заметки</h1>
+
+  <form id="note-form">
+    <input type="text" id="note-text" placeholder="Введите текст заметки" required>
+    <button type="submit">Добавить</button>
+  </form>
+
+  <ul id="notes-list"></ul>
+
+  <script>
+    const form = document.getElementById('note-form');
+    const input = document.getElementById('note-text');
+    const list = document.getElementById('notes-list');
+
+    async function loadNotes() {
+      const res = await fetch('/api/notes');
+      const notes = await res.json();
+      list.innerHTML = '';
+      notes.forEach(note => {
+        const li = document.createElement('li');
+        li.textContent = note.text;
+        list.appendChild(li);
+      });
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await fetch('/api/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: input.value })
+      });
+      input.value = '';
+      loadNotes();
+    });
+
+    loadNotes();
+  </script>
+</body>
+</html>
