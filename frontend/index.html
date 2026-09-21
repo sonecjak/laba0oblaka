@@ -2,52 +2,340 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Лаба 0 — заметки</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Заметки</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E📓%3C/text%3E%3C/svg%3E">
   <style>
-    body { font-family: sans-serif; max-width: 500px; margin: 40px auto; }
-    input { padding: 8px; width: 70%; }
-    button { padding: 8px 16px; }
-    ul { padding-left: 20px; }
+    :root {
+      --cell: 28px;            /* размер клетки: вся вёрстка кратна ему */
+      --gutter: 72px;          /* ширина полей слева от красной линии */
+      --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+      --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+      --paper: #fbfcfe;
+      --grid: #d5e1f2;
+      --ink: #1b2f6b;
+      --muted: #5f6f94;
+      --margin: #d64545;
+      --mark: rgba(255, 213, 79, .55);
+      --focus: #2f6fed;
+      --error: #b3261e;
+      --on-ink: #ffffff;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --paper: #0e1524;
+        --grid: #1a2740;
+        --ink: #c6d4ff;
+        --muted: #8fa0c9;
+        --margin: #c8514d;
+        --mark: rgba(255, 213, 79, .22);
+        --focus: #7aa2ff;
+        --error: #ff8a80;
+        --on-ink: #0e1524;
+      }
+    }
+
+    @media (max-width: 520px) {
+      :root { --gutter: 56px; }
+    }
+
+    * { box-sizing: border-box; }
+
+    html { -webkit-text-size-adjust: 100%; }
+
+    body {
+      margin: 0;
+      background-color: var(--paper);
+      background-image:
+        linear-gradient(var(--grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+      background-size: var(--cell) var(--cell);
+      background-position: 0 -4px, -1px 0;
+      color: var(--ink);
+      font-family: var(--serif);
+    }
+
+    .page {
+      position: relative;
+      max-width: 760px;
+      min-height: 100vh;
+      min-height: 100dvh;
+      margin: 0 auto;
+      padding: calc(var(--cell) * 2) 24px calc(var(--cell) * 2) calc(var(--gutter) + 20px);
+    }
+
+    /* красная линия полей */
+    .page::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: var(--gutter);
+      width: 2px;
+      background: var(--margin);
+      opacity: .85;
+    }
+
+    h1 {
+      margin: 0 0 var(--cell);
+      font-size: 46px;
+      line-height: calc(var(--cell) * 2);
+      font-weight: 700;
+      letter-spacing: -.01em;
+    }
+
+    /* поле ввода: строка, в которой пишут */
+    .composer {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      height: calc(var(--cell) * 2);
+      margin: 0 0 var(--cell);
+    }
+
+    .composer input {
+      flex: 1;
+      min-width: 0;
+      height: calc(var(--cell) * 2);
+      padding: 0;
+      border: 0;
+      border-bottom: 2px solid var(--ink);
+      border-radius: 0;
+      background: transparent;
+      color: var(--ink);
+      font: 19px/28px var(--serif);
+    }
+
+    .composer input::placeholder { color: var(--muted); opacity: 1; }
+
+    .composer input:focus { outline: none; }
+    .composer input:focus-visible {
+      border-bottom-color: var(--focus);
+      box-shadow: 0 2px 0 var(--focus);
+    }
+
+    .composer button {
+      flex: none;
+      height: 40px;
+      padding: 0 20px;
+      border: 0;
+      border-radius: 4px;
+      background: var(--ink);
+      color: var(--on-ink);
+      font: 600 15px/1 var(--sans);
+      cursor: pointer;
+    }
+
+    .composer button:hover { filter: brightness(1.15); }
+    .composer button:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+    .composer button:disabled { opacity: .55; cursor: progress; filter: none; }
+
+    /* строка состояния: место зарезервировано, чтобы список не прыгал */
+    .status {
+      min-height: var(--cell);
+      margin: 0;
+      color: var(--muted);
+      font: 15px/28px var(--sans);
+    }
+    .status[data-kind="error"] { color: var(--error); font-weight: 600; }
+
+    .notes {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .note {
+      position: relative;
+      margin: 0 0 var(--cell);
+      font-size: 19px;
+      line-height: var(--cell);
+      overflow-wrap: anywhere;
+    }
+
+    /* номер записи в базе стоит на полях, как номер строки */
+    .note .id {
+      position: absolute;
+      top: 0;
+      right: calc(100% + 32px);
+      color: var(--muted);
+      font: 13px/28px var(--sans);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .note .text {
+      padding: 0 2px;
+      margin: 0 -2px;
+      -webkit-box-decoration-break: clone;
+      box-decoration-break: clone;
+    }
+
+    /* только что добавленная запись: маркер, который «высыхает» */
+    .note.fresh .text { animation: settle 2.6s ease-out; }
+    @keyframes settle {
+      from { background-color: var(--mark); }
+      to   { background-color: transparent; }
+    }
+
+    .empty {
+      margin: 0 0 var(--cell);
+      font-size: 19px;
+      line-height: var(--cell);
+      color: var(--muted);
+    }
+
+    .footer {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      column-gap: 16px;
+      color: var(--muted);
+      font: 14px/28px var(--sans);
+    }
+    .footer span { white-space: nowrap; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .note.fresh .text { animation: none; }
+    }
   </style>
 </head>
 <body>
-  <h1>Заметки</h1>
+  <main class="page">
+    <h1>Заметки</h1>
 
-  <form id="note-form">
-    <input type="text" id="note-text" placeholder="Введите текст заметки" required>
-    <button type="submit">Добавить</button>
-  </form>
+    <form id="note-form" class="composer" autocomplete="off">
+      <input type="text" id="note-text" name="text" maxlength="1000"
+             placeholder="Что записать?" aria-label="Текст заметки">
+      <button type="submit" id="add-btn">Добавить</button>
+    </form>
 
-  <ul id="notes-list"></ul>
+    <p id="status" class="status" role="status" aria-live="polite">Загружаю записи…</p>
+
+    <p id="empty" class="empty" hidden>Пока пусто. Напишите первую заметку, она сохранится в базе данных.</p>
+    <ul id="notes" class="notes"></ul>
+
+    <div class="footer">
+      <span id="count"></span>
+      <span id="backend"></span>
+    </div>
+  </main>
 
   <script>
+    const API = '/api/notes';
+
     const form = document.getElementById('note-form');
     const input = document.getElementById('note-text');
-    const list = document.getElementById('notes-list');
+    const button = document.getElementById('add-btn');
+    const statusEl = document.getElementById('status');
+    const emptyEl = document.getElementById('empty');
+    const listEl = document.getElementById('notes');
+    const countEl = document.getElementById('count');
+    const backendEl = document.getElementById('backend');
+
+    let seenIds = null;      // id, которые уже показывали; null до первой загрузки
+    let statusTimer = null;
+
+    function plural(n, one, few, many) {
+      const m10 = n % 10, m100 = n % 100;
+      if (m10 === 1 && m100 !== 11) return one;
+      if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return few;
+      return many;
+    }
+
+    function setStatus(text, kind, autoClearMs) {
+      clearTimeout(statusTimer);
+      statusEl.textContent = text;
+      statusEl.dataset.kind = kind || '';
+      if (autoClearMs) {
+        statusTimer = setTimeout(() => { statusEl.textContent = ''; statusEl.dataset.kind = ''; }, autoClearMs);
+      }
+    }
+
+    function messageFor(status) {
+      if (status === 400) return 'Заметка пустая или слишком длинная. Введите текст до 1000 символов.';
+      if (status === 429) return 'Слишком много запросов подряд. Подождите пару секунд и повторите.';
+      if (status === 502 || status === 503 || status === 504) return 'Сервер или база данных сейчас недоступны. Повторите через несколько секунд.';
+      if (status >= 500) return 'На сервере произошла ошибка. Посмотрите логи бэкенда.';
+      return 'Сервер ответил с кодом ' + status + '.';
+    }
+
+    async function request(url, options) {
+      let res;
+      try {
+        res = await fetch(url, options);
+      } catch (e) {
+        throw new Error('Нет связи с сервером. Проверьте, что бэкенд запущен, и повторите.');
+      }
+      const backend = res.headers.get('X-Backend-Id');
+      if (backend) backendEl.textContent = 'Ответил бэкенд: ' + backend;
+      if (!res.ok) throw new Error(messageFor(res.status));
+      return res;
+    }
+
+    function render(notes) {
+      listEl.textContent = '';
+      for (const note of notes) {
+        const li = document.createElement('li');
+        li.className = 'note';
+        if (seenIds && !seenIds.has(note.id)) li.classList.add('fresh');
+
+        const id = document.createElement('span');
+        id.className = 'id';
+        id.textContent = '№' + note.id;
+
+        const text = document.createElement('span');
+        text.className = 'text';
+        text.textContent = note.text;   // textContent: разметка из заметок не выполняется
+
+        li.append(id, text);
+        listEl.appendChild(li);
+      }
+      seenIds = new Set(notes.map(n => n.id));
+      emptyEl.hidden = notes.length > 0;
+      countEl.textContent = notes.length
+        ? notes.length + ' ' + plural(notes.length, 'запись', 'записи', 'записей') + ' в базе'
+        : 'Записей нет';
+    }
 
     async function loadNotes() {
-      const res = await fetch('/api/notes');
-      const notes = await res.json();
-      list.innerHTML = '';
-      notes.forEach(note => {
-        const li = document.createElement('li');
-        li.textContent = note.text;
-        list.appendChild(li);
-      });
+      const res = await request(API);
+      render(await res.json());
     }
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      await fetch('/api/notes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: input.value })
-      });
-      input.value = '';
-      loadNotes();
+      const text = input.value.trim();
+      if (!text) {
+        setStatus('Введите текст заметки: пустые записи не сохраняются.', 'error');
+        input.focus();
+        return;
+      }
+      button.disabled = true;
+      try {
+        await request(API, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text })
+        });
+        input.value = '';
+        await loadNotes();
+        setStatus('Заметка добавлена', '', 3000);
+      } catch (err) {
+        setStatus(err.message, 'error');
+      } finally {
+        button.disabled = false;
+        input.focus();
+      }
     });
 
-    loadNotes();
+    emptyEl.hidden = true;
+    loadNotes()
+      .then(() => setStatus(''))
+      .catch(err => setStatus(err.message, 'error'));
   </script>
 </body>
 </html>
