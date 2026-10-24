@@ -355,7 +355,6 @@ HTTP/1.1 200 OK
 
 В браузере то же самое: окошко логина, а после ввода пароля страничка «Админка».
 
-<img width="610" height="329" alt="Снимок экрана — 2026-10-24 в 14 52 48" src="https://github.com/user-attachments/assets/cbba3a26-b12d-4451-9c58-d60732284f5c" />
 <img width="608" height="153" alt="Снимок экрана — 2026-10-24 в 14 51 40" src="https://github.com/user-attachments/assets/570e9388-4f5c-435c-bbb1-4fc317852eb1" />
 <img width="605" height="297" alt="Снимок экрана — 2026-10-24 в 14 59 13" src="https://github.com/user-attachments/assets/7331c0c4-12a1-42f1-bf55-6723f797329e" />
 
