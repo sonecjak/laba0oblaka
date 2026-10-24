@@ -110,10 +110,11 @@ htpasswd -c -b .htpasswd admin admin123
 
 `-c` создаёт новый файл, `-b` берёт пароль прямо из команды, а не спрашивает. В файл пароль ложится не текстом, а хешем. Пароль `admin123` учебный, в реальной жизни так делать не надо.
 
-<img width="604" height="146" alt="Снимок экрана — 2026-10-24 в 14 46 45" src="https://github.com/user-attachments/assets/db432084-6482-4d5b-98d0-532575a42785" />
+
 <img width="607" height="165" alt="Снимок экрана — 2026-10-24 в 14 41 47" src="https://github.com/user-attachments/assets/6decc8e8-7d20-4666-94d2-4266996dd2af" />
 <img width="609" height="434" alt="Снимок экрана — 2026-10-24 в 14 46 31" src="https://github.com/user-attachments/assets/0968e122-b4bd-4057-81fa-51382b0a9510" />
 <img width="606" height="71" alt="Снимок экрана — 2026-10-24 в 14 42 44" src="https://github.com/user-attachments/assets/2367e34b-9727-4d42-9ab7-0f35b189de3a" />
+<img width="604" height="146" alt="Снимок экрана — 2026-10-24 в 14 46 45" src="https://github.com/user-attachments/assets/db432084-6482-4d5b-98d0-532575a42785" />
 
 
 ### 3. Запустить nginx
