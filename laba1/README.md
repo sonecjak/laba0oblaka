@@ -2,8 +2,6 @@
 
 # Вступление
 
-<!-- СКРИН/КАРТИНКА В НАЧАЛО: images/00-intro.png -->
-
 Задачей этой лабы было сделать из nginx точку входа и балансировщик перед нашим сервисом «Заметки» из Лабы 0, чтобы сайт жил, даже когда один из бэкендов упал.
 
 # Что было сделано
@@ -88,7 +86,9 @@ curl http://localhost:5001/api/health   # {"backend":"backend-1","status":"ok"}
 curl http://localhost:5002/api/health   # {"backend":"backend-2","status":"ok"}
 ```
 
-<!-- СКРИН: images/01-health.png -->
+<img width="603" height="39" alt="Снимок экрана — 2026-10-24 в 14 42 00" src="https://github.com/user-attachments/assets/c5bd2ff0-9894-476b-be81-dc1971cdbe59" />
+<img width="607" height="165" alt="Снимок экрана — 2026-10-24 в 14 41 47" src="https://github.com/user-attachments/assets/708590d7-2226-4165-8d43-1f3455a63f5a" />
+
 
 ### 2. Сертификат и пароль для админки
 
@@ -110,7 +110,11 @@ htpasswd -c -b .htpasswd admin admin123
 
 `-c` создаёт новый файл, `-b` берёт пароль прямо из команды, а не спрашивает. В файл пароль ложится не текстом, а хешем. Пароль `admin123` учебный, в реальной жизни так делать не надо.
 
-<!-- СКРИН: images/02-ssl-htpasswd.png -->
+<img width="604" height="146" alt="Снимок экрана — 2026-10-24 в 14 46 45" src="https://github.com/user-attachments/assets/db432084-6482-4d5b-98d0-532575a42785" />
+<img width="607" height="165" alt="Снимок экрана — 2026-10-24 в 14 41 47" src="https://github.com/user-attachments/assets/6decc8e8-7d20-4666-94d2-4266996dd2af" />
+<img width="609" height="434" alt="Снимок экрана — 2026-10-24 в 14 46 31" src="https://github.com/user-attachments/assets/0968e122-b4bd-4057-81fa-51382b0a9510" />
+<img width="606" height="71" alt="Снимок экрана — 2026-10-24 в 14 42 44" src="https://github.com/user-attachments/assets/2367e34b-9727-4d42-9ab7-0f35b189de3a" />
+
 
 ### 3. Запустить nginx
 
@@ -137,8 +141,8 @@ docker exec lab1_nginx nginx -t
 # nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
 # nginx: configuration file /etc/nginx/nginx.conf test is successful
 ```
+<img width="602" height="188" alt="Снимок экрана — 2026-10-24 в 14 48 09" src="https://github.com/user-attachments/assets/b1ca4743-eb2d-4f80-b051-d60034e2c521" />
 
-<!-- СКРИН: images/03-docker-run.png -->
 
 ## Конфиг
 
@@ -292,8 +296,8 @@ Content-Length: 169
 Connection: keep-alive
 Location: https://localhost/
 ```
+<img width="610" height="180" alt="Снимок экрана — 2026-10-24 в 14 49 44" src="https://github.com/user-attachments/assets/3881551b-b0ac-4bcb-9752-8149a0c2d7de" />
 
-<!-- СКРИН: images/04-redirect.png -->
 
 ### Балансировка
 
@@ -307,8 +311,8 @@ $ curl -i -k https://localhost/api/notes   →   X-Backend-Id: backend-1
 ```
 
 Запросы реально уходят на оба инстанса: то первый, то второй, некий баланс.
+<img width="610" height="640" alt="Снимок экрана — 2026-10-24 в 14 50 18" src="https://github.com/user-attachments/assets/860cffc4-a2b9-4431-84d7-abd3abceee79" />
 
-<!-- СКРИН: images/05-balancing.png -->
 
 ### Отказоустойчивость (главное!)
 
@@ -326,7 +330,8 @@ X-Backend-Id: backend-2
 
 Половина бэкенда лежит, а сайт отвечает `200`: nginx увёл трафик на живой инстанс. Мы выжили!!!
 
-<!-- СКРИН: images/06-failover.png -->
+<img width="602" height="370" alt="Снимок экрана — 2026-10-24 в 14 50 55" src="https://github.com/user-attachments/assets/a2eb4f78-c8f9-4a5e-ac5b-b106320e5715" />
+
 
 ### Админка
 
@@ -349,7 +354,11 @@ HTTP/1.1 200 OK
 
 В браузере то же самое: окошко логина, а после ввода пароля страничка «Админка».
 
-<!-- СКРИНЫ: images/07-admin-401.png, images/08-admin-200.png, images/09-admin-browser.png -->
+<img width="610" height="329" alt="Снимок экрана — 2026-10-24 в 14 52 48" src="https://github.com/user-attachments/assets/cbba3a26-b12d-4451-9c58-d60732284f5c" />
+<img width="608" height="153" alt="Снимок экрана — 2026-10-24 в 14 51 40" src="https://github.com/user-attachments/assets/570e9388-4f5c-435c-bbb1-4fc317852eb1" />
+<img width="605" height="297" alt="Снимок экрана — 2026-10-24 в 14 59 13" src="https://github.com/user-attachments/assets/7331c0c4-12a1-42f1-bf55-6723f797329e" />
+
+
 
 ### Лимит запросов
 
@@ -362,8 +371,8 @@ done
 ```
 
 Первые 11 проходят (`200`): это 1 обычный запрос плюс 10 запасных из `burst`. Всё остальное получает `429 Too Many Requests`. Лимит работает.
+<img width="607" height="269" alt="Снимок экрана — 2026-10-24 в 14 53 32" src="https://github.com/user-attachments/assets/7b38bc51-3ce1-4fd8-9b52-bb3d7aff259f" />
 
-<!-- СКРИН: images/10-ratelimit.png -->
 
 ### Виртуальные хосты
 
@@ -380,7 +389,8 @@ curl: (52) Empty reply from server    ← default_server рвёт соедине
 
 Домены друг другу ничего не сливают, а чужой `Host` не получает вообще ничего. `--resolve` нужен, чтобы сказать curl, что `project2.local` это наш `127.0.0.1` (такого домена в интернете нет).
 
-<!-- СКРИН: images/11-vhosts.png -->
+<img width="608" height="145" alt="Снимок экрана — 2026-10-24 в 14 54 44" src="https://github.com/user-attachments/assets/f0546e84-86c9-4e53-b19c-5b4999be3e17" />
+
 
 ### Своя 404
 
@@ -394,7 +404,9 @@ HTTP/1.1 404 Not Found
 
 Вместо стандартной страницы nginx отдаётся наша.
 
-<!-- СКРИНЫ: images/12-404-curl.png, images/13-404-browser.png -->
+<img width="607" height="183" alt="Снимок экрана — 2026-10-24 в 15 00 16" src="https://github.com/user-attachments/assets/69fd1543-5452-4c09-b541-16c0aafdce0c" />
+<img width="602" height="287" alt="Снимок экрана — 2026-10-24 в 15 00 26" src="https://github.com/user-attachments/assets/f1add748-c84e-4403-99ef-a6f0fe13b131" />
+
 
 ### alias
 
@@ -403,7 +415,10 @@ $ curl -k https://localhost/docs/
 <h1>Документация</h1><p>Отдаётся через alias из /var/www/docs</p>
 ```
 
-<!-- СКРИН: images/14-docs.png -->
+
+<img width="603" height="57" alt="Снимок экрана — 2026-10-24 в 15 01 14" src="https://github.com/user-attachments/assets/e6f1ebd4-5308-442e-8936-158d3d097800" />
+
+<img width="614" height="278" alt="Снимок экрана — 2026-10-24 в 15 01 22" src="https://github.com/user-attachments/assets/8bdc7be2-ba2d-400c-8c75-4e9b989a0290" />
 
 Чтобы прогнать всё разом:
 
@@ -418,7 +433,7 @@ chmod +x check.sh
 
 > *Опять не тот порт...*
 
-**«Порт 5432 уже занят».** `docker compose up` падал с `port is already allocated`. Оказалось, что с прошлой лабы продолжал крутиться контейнер `laba0oblaka-db-1`, который порт и держал. Ну и отлично, значит, его и используем.
+**«Порт 5432 уже занят».** `docker compose up` падал с `port is already allocated`. Оказалось, что с прошлой лабы продолжал крутиться контейнер `laba0oblaka-db-1`, который порт и держал. Отлично, значит, его и используем.
 
 **Порт 5000 на маке.** Его занимает AirPlay, поэтому бэкенды у нас на 5001 и 5002. Сначала на Windows поднимали на 5000 и 5001, а потом поменяли в nginx на 5001 и 5002 и перезапустили.
 
@@ -452,7 +467,8 @@ docker compose restart backend-1 backend-2
 
 **Самоподписанный сертификат.** Safari ругается «Это подключение не защищено», потому что сертификат мы сделали сами. Для локалки это нормально: жмём «Подробнее» и заходим.
 
-<!-- СКРИН: images/15-safari-cert.png -->
+<img width="604" height="390" alt="Снимок экрана — 2026-10-24 в 15 02 26" src="https://github.com/user-attachments/assets/b7658b0e-af52-4e1d-b9ff-c97e0842fa4d" />
+
 
 # Независимая перепроверка
 
@@ -472,7 +488,9 @@ docker compose restart backend-1 backend-2
 - `curl -H "Host: unknown.local" http://127.0.0.1/` → `curl: (52) Empty reply from server`, то есть сработал `return 444` и чужому домену ничего не досталось;
 - 30 запросов к `/api/notes` без пауз → сначала `200`, потом пошли `429` — лимит сработал.
 
-<!-- СКРИН: images/17-nastya-checks.png -->
+<img width="783" height="434" alt="Снимок экрана — 2026-10-24 в 15 08 03" src="https://github.com/user-attachments/assets/444b468a-afca-4a3e-821c-b2df357631d3" />
+
+
 
 Независимая перепроверка на отдельной копии репозитория подтвердила все те же результаты, что и в основном прогоне: значит, дело не в случайности или особенностях одной машины, а в том, что конфиг действительно работает как надо.
 
@@ -501,7 +519,10 @@ server: nginx
 x-powered-by: PHP/8.1.21
 ```
 
-<!-- СКРИН: images/18-target-choice.png -->
+<img width="895" height="222" alt="Снимок экрана — 2026-10-24 в 15 08 51" src="https://github.com/user-attachments/assets/34705025-319d-47bb-a6f6-d555a5f11cc9" />
+<img width="926" height="249" alt="Снимок экрана — 2026-10-24 в 15 08 58" src="https://github.com/user-attachments/assets/bac7451c-6645-4b50-9d25-a071de5fc276" />
+
+
 
 Проверили три типа слабых мест в конфигурации:
 
@@ -540,7 +561,10 @@ HTTP/2 404
 
 Флаг `--path-as-is` обязателен, иначе curl сам нормализует `../` в пути ещё до отправки запроса. Оба варианта вернули `404` — ни обычный `../`, ни заход через вариацию пути без слэша (имитация неправильного `alias`) не сработали.
 
-<!-- СКРИН: images/19-pentest-results.png -->
+<img width="556" height="639" alt="Снимок экрана — 2026-10-24 в 15 10 09" src="https://github.com/user-attachments/assets/3bf38bc1-a282-4263-a87d-e42acbe7c85b" />
+<img width="937" height="658" alt="Снимок экрана — 2026-10-24 в 15 10 46" src="https://github.com/user-attachments/assets/8ed2939d-b2f4-458f-b83c-f8222d8b8d5b" />
+<img width="973" height="690" alt="Снимок экрана — 2026-10-24 в 15 10 58" src="https://github.com/user-attachments/assets/b4ad45fe-645d-42e4-b40e-67a6f2bf430b" />
+
 
 **Итог звёздочки:** взлом не удался. Все три проверенные уязвимости (листинг каталога, служебные файлы, path traversal) закрыты правильной настройкой nginx на `ftsoo.ru`. Отрицательный результат — тоже результат: он показывает, что сайт настроен аккуратнее, чем мог бы быть, а заодно подтверждает на практике, зачем в своём конфиге мы сами закрывали ровно эти же дыры (`internal` для 404, правильные слэши в `alias`, `default_server` с `444`).
 
@@ -559,7 +583,8 @@ docker compose up --build -d
 
 Не нужны ни `venv`, ни локальный Python, оба бэкенда запускаются сразу в изолированной сети, а одногруппник скачивает проект из Git и получает рабочую систему одной командой. Минус тот же: гонка бэкендов при первом старте (см. «Грабли»).
 
-<!-- СКРИН: images/16-compose.png -->
+<img width="602" height="348" alt="Снимок экрана — 2026-10-24 в 15 12 25" src="https://github.com/user-attachments/assets/e06a416b-b4bd-4970-8081-d06589511191" />
+
 
 # Итог
 
