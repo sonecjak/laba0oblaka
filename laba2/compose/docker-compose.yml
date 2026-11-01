@@ -1,0 +1,80 @@
+# лаба 2, часть 3: весь стек «Заметки» поднимается одной командой
+# запускать из папки laba2/compose:  docker compose up -d --build
+
+name: laba2   # имя проекта, отсюда названия laba2-db-1, laba2_notes_db_data и т.д.
+
+services:
+  # база данных. порт наружу не открываем, к ней ходит только бэкенд
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: lab0
+      POSTGRES_USER: lab0
+      POSTGRES_PASSWORD: lab0
+    volumes:
+      - notes_db_data:/var/lib/postgresql/data   # данные лежат в томе, поэтому не пропадают после docker rm
+    networks:
+      - backnet
+    # [звёздочка] база готова, когда начинает принимать подключения
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lab0 -d lab0"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  # бэкенд собирается из хорошего Dockerfile из laba2/good
+  backend:
+    build: ../good
+    image: notes-good
+    restart: unless-stopped
+    environment:
+      DB_HOST: db              # к базе обращаемся просто по имени сервиса
+      DB_PORT: "5432"
+      DB_NAME: lab0
+      DB_USER: lab0
+      DB_PASSWORD: lab0
+      INSTANCE_ID: backend
+    networks:
+      - frontnet               # отсюда к нему ходит nginx
+      - backnet                # а отсюда он сам ходит в базу
+    # [звёздочка] бэкенд не стартует, пока база не готова
+    depends_on:
+      db:
+        condition: service_healthy
+    # проверка та же, что в Dockerfile, только почаще, чтобы стек быстрее поднимался
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/api/health', timeout=3).close()"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # фронт: nginx отдаёт страничку, а запросы на /api передаёт бэкенду
+  frontend:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "8080:80"              # наружу открыт только этот порт
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../good/frontend:/usr/share/nginx/html:ro
+    networks:
+      - frontnet               # в backnet его не добавляем, так что до базы он не дотянется
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+networks:
+  frontnet: {}                 # сеть nginx и бэкенда
+  backnet:                     # сеть бэкенда и базы
+    internal: true             # из этой сети нет выхода в интернет
+
+volumes:
+  notes_db_data: {}
