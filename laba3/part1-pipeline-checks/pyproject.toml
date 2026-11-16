@@ -1,0 +1,17 @@
+# Настройки проверок для сервиса «Заметки» из laba0.
+# Код сервиса лежит в ../../laba0/backend, здесь только тесты и конфиги.
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+src = ["../../laba0/backend", "."]
+
+[tool.ruff.lint]
+# E/W — стиль (pycodestyle), F — ошибки (pyflakes: неиспользуемые импорты, опечатки в именах),
+# I — порядок импортов, B — типичные баги (bugbear), UP — устаревший синтаксис.
+select = ["E", "W", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["../../laba0/backend"]
+addopts = "-ra"

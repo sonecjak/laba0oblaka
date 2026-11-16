@@ -1,0 +1,116 @@
+# ХОРОШИЙ пайплайн для сервиса «Заметки» из laba0.
+# Тесты и настройки проверок: laba3/part1-pipeline-checks.
+# Стадии: lint → test. Если lint упал, test не запускается и весь прогон красный.
+# Следующие стадии (сборка образа и т.д.) добавлять как новые jobs с `needs: test`.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "laba0/**"
+      - "laba3/part1-pipeline-checks/**"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    paths:
+      - "laba0/**"
+      - "laba3/part1-pipeline-checks/**"
+      - ".github/workflows/ci.yml"
+  workflow_dispatch:
+
+# Токену нужен только доступ на чтение кода.
+permissions:
+  contents: read
+
+# Новый пуш в ту же ветку отменяет устаревший прогон.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.13"          # та же версия, что в laba2/good/Dockerfile
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+defaults:
+  run:
+    # тесты и конфиги лежат здесь, а код сервиса — в ../../laba0/backend
+    working-directory: laba3/part1-pipeline-checks
+
+jobs:
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      # Экшены закреплены по SHA коммита: тег можно перевесить, SHA — нет.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          # Кеш pip: ключ считается от файла зависимостей,
+          # пока они не меняются, пакеты берутся из кеша.
+          cache: pip
+          cache-dependency-path: laba3/part1-pipeline-checks/requirements-dev.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Ruff check
+        # --output-format=github: ошибки подсвечиваются прямо в коде на вкладке PR
+        run: ruff check --config pyproject.toml --output-format=github ../../laba0/backend tests
+
+  test:
+    name: Tests (pytest + PostgreSQL)
+    needs: lint                    # не тратим время на тесты, если линтер упал
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    services:
+      postgres:
+        image: postgres:16.14-alpine   # зафиксированная версия, та же мажорная, что в laba0
+        env:
+          POSTGRES_DB: lab0
+          POSTGRES_USER: lab0
+          POSTGRES_PASSWORD: lab0
+        ports:
+          - 5432:5432
+        # Шаги начнутся только когда БД реально принимает подключения.
+        options: >-
+          --health-cmd "pg_isready -U lab0 -d lab0"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DB_HOST: localhost
+      DB_PORT: "5432"
+      DB_NAME: lab0
+      DB_USER: lab0
+      DB_PASSWORD: lab0
+      INSTANCE_ID: ci
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: laba3/part1-pipeline-checks/requirements-dev.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run tests
+        # Без `|| true` и без continue-on-error: упавший тест = красный прогон.
+        run: pytest --junitxml=pytest-report.xml
+
+      - name: Upload test report
+        if: ${{ !cancelled() }}        # отчёт нужен и когда тесты упали
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pytest-report
+          path: laba3/part1-pipeline-checks/pytest-report.xml
+          retention-days: 14

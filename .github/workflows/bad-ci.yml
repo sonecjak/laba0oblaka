@@ -1,0 +1,43 @@
+# ПЛОХОЙ пайплайн — сохранён специально для сравнения (Лаба 3, человек 1).
+# Он рабочий: запускается и становится зелёным. Проблема как раз в том,
+# что он зелёный даже тогда, когда код сломан.
+# Запуск только вручную: Actions → "BAD CI" → Run workflow.
+# Номера [1]–[7] соответствуют таблице в laba3/part1-pipeline-checks/README.md.
+
+name: BAD CI (для сравнения)
+
+on:
+  workflow_dispatch:
+
+# [6] нет блока permissions — токен получает права по умолчанию, шире, чем нужно
+
+jobs:
+  everything:                      # [7] всё в одной задаче, нет timeout-minutes
+    runs-on: ubuntu-latest         # [2] плавающая версия раннера
+    services:
+      postgres:
+        image: postgres:latest     # [2] плавающий тег образа: завтра может приехать другая мажорная версия
+        env:
+          POSTGRES_DB: lab0
+          POSTGRES_USER: lab0
+          POSTGRES_PASSWORD: lab0
+        ports:
+          - 5432:5432
+        # [5] нет healthcheck: шаги стартуют, не дождавшись готовности БД
+
+    steps:
+      - uses: actions/checkout@main          # [1] экшен с ветки main, а не с зафиксированной версии
+      - uses: actions/setup-python@main      # [1]
+        with:
+          python-version: "3.x"              # [2] «какой-нибудь третий питон»
+
+      # [3] нет кеша: все пакеты каждый раз качаются заново
+      # [2] версии пакетов не зафиксированы
+      - run: pip install flask psycopg2-binary pytest ruff
+
+      # [4] ошибки линтера игнорируются
+      - run: ruff check laba0/backend || true
+
+      # [4] упавшие тесты не валят пайплайн
+      - run: cd laba3/part1-pipeline-checks && python -m pytest
+        continue-on-error: true
