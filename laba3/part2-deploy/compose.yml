@@ -1,0 +1,37 @@
+name: notes-lab3
+
+services:
+  db:
+    image: postgres:16.14-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: lab0
+      POSTGRES_USER: lab0
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD}
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "lab0", "-d", "lab0"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    volumes:
+      - notes_data:/var/lib/postgresql/data
+
+  backend:
+    image: ${NOTES_IMAGE:?set NOTES_IMAGE}
+    platform: ${NOTES_PLATFORM:-}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: lab0
+      DB_USER: lab0
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD}
+      INSTANCE_ID: lab3
+    ports:
+      - "127.0.0.1:18080:5000"
+
+volumes:
+  notes_data:

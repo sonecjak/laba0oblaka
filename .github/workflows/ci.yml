@@ -1,7 +1,6 @@
 # ХОРОШИЙ пайплайн для сервиса «Заметки» из laba0.
 # Тесты и настройки проверок: laba3/part1-pipeline-checks.
-# Стадии: lint → test. Если lint упал, test не запускается и весь прогон красный.
-# Следующие стадии (сборка образа и т.д.) добавлять как новые jobs с `needs: test`.
+# Стадии: lint → test → сборка и Trivy → публикация → деплой и curl на Mac.
 
 name: CI
 
@@ -10,23 +9,32 @@ on:
     branches: [main]
     paths:
       - "laba0/**"
+      - "laba2/good/**"
       - "laba3/part1-pipeline-checks/**"
+      - "laba3/part2-deploy/**"
       - ".github/workflows/ci.yml"
   pull_request:
     paths:
       - "laba0/**"
+      - "laba2/good/**"
       - "laba3/part1-pipeline-checks/**"
+      - "laba3/part2-deploy/**"
       - ".github/workflows/ci.yml"
   workflow_dispatch:
+    inputs:
+      trivy_before:
+        description: "Проверить старый базовый образ"
+        type: boolean
+        default: false
 
-# Токену нужен только доступ на чтение кода.
+# Права по умолчанию. Права на публикацию и статусы указаны в задачах.
 permissions:
   contents: read
 
-# Новый пуш в ту же ветку отменяет устаревший прогон.
+# Новый пуш не прерывает выполняющийся прогон.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   PYTHON_VERSION: "3.13"          # та же версия, что в laba2/good/Dockerfile
@@ -114,3 +122,172 @@ jobs:
           name: pytest-report
           path: laba3/part1-pipeline-checks/pytest-report.xml
           retention-days: 14
+
+
+  image:
+    name: Build, scan and publish image
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: .
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      ref: ${{ steps.meta.outputs.image }}
+      digest: ${{ steps.publish.outputs.digest }}
+    env:
+      TRIVY_IMAGE: ghcr.io/aquasecurity/trivy:0.74.0
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Prepare image metadata
+        id: meta
+        env:
+          IS_BEFORE: ${{ github.event_name == 'workflow_dispatch' && inputs.trivy_before }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}:$GITHUB_SHA"
+          base=$(sed -n 's/^ARG PYTHON_BASE=//p' laba2/good/Dockerfile)
+          : "${base:?missing Dockerfile base image}"
+
+          if [[ "$IS_BEFORE" == true ]]; then
+            base=python:3.13.0-bookworm
+          fi
+
+          printf 'image=%s\nbase=%s\n' "$image" "$base" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare Docker build context
+        run: |
+          context="$RUNNER_TEMP/notes-context"
+          mkdir -p "$context/frontend"
+          cp laba2/good/{Dockerfile,.dockerignore,requirements.txt} "$context/"
+          cp laba0/backend/app.py "$context/app.py"
+          cp laba0/frontend/index.html "$context/frontend/index.html"
+
+      - uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435
+
+      - name: Build image without publishing
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83
+        with:
+          context: ${{ runner.temp }}/notes-context
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: ${{ steps.meta.outputs.image }}
+          build-args: PYTHON_BASE=${{ steps.meta.outputs.base }}
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha,scope=notes-lab3
+          cache-to: type=gha,mode=max,scope=notes-lab3,ignore-error=true
+
+      - name: Trivy report (HIGH and CRITICAL)
+        id: report
+        env:
+          NOTES_IMAGE: ${{ steps.meta.outputs.image }}
+          PYTHON_BASE: ${{ steps.meta.outputs.base }}
+        run: |
+          scan="$RUNNER_TEMP/notes-scan"
+          mkdir -p "$scan/reports" "$scan/cache"
+          docker save --output "$scan/image.tar" "$NOTES_IMAGE"
+
+          docker run --rm -v "$scan:/scan" "$TRIVY_IMAGE" \
+            --cache-dir /scan/cache image --input /scan/image.tar \
+            --scanners vuln --severity HIGH,CRITICAL --exit-code 0 \
+            --format json --output /scan/reports/trivy.json
+
+          jq -er '
+            [.Results[]? | .Vulnerabilities[]? | .Severity] as $levels |
+            ["CRITICAL", "HIGH"][] as $level |
+            "\($level)\t\($levels | map(select(. == $level)) | length)"
+          ' "$scan/reports/trivy.json" > "$scan/reports/severity.tsv"
+
+          printf 'Image: %s\nBase: %s\n' "$NOTES_IMAGE" "$PYTHON_BASE"
+          cat "$scan/reports/severity.tsv"
+
+      - name: Trivy gate (fail on CRITICAL)
+        run: |
+          docker run --rm -v "$RUNNER_TEMP/notes-scan:/scan" "$TRIVY_IMAGE" \
+            --cache-dir /scan/cache image --input /scan/image.tar \
+            --scanners vuln --skip-db-update --severity CRITICAL \
+            --exit-code 1 --format table
+
+      - name: Upload Trivy reports
+        if: ${{ !cancelled() && steps.report.outcome == 'success' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: trivy-report
+          path: ${{ runner.temp }}/notes-scan/reports/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish scanned image to GHCR
+        id: publish
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        env:
+          NOTES_IMAGE: ${{ steps.meta.outputs.image }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s\n' "$GHCR_TOKEN" |
+            docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          set -o pipefail
+          push_log="$RUNNER_TEMP/notes-push.log"
+          docker push "$NOTES_IMAGE" | tee "$push_log"
+          digest=$(sed -nE 's/^.*digest: (sha256:[0-9a-f]{64}) size: [0-9]+.*$/\1/p' "$push_log")
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          printf 'digest=%s\n' "$digest" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    name: Deploy on Mac and check live service
+    needs: image
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: .
+    concurrency:
+      group: notes-lab3-deploy
+      cancel-in-progress: false
+    permissions:
+      statuses: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      IMAGE_TAG: ${{ needs.image.outputs.ref }}
+      IMAGE_DIGEST: ${{ needs.image.outputs.digest }}
+
+    steps:
+      - name: Request local deployment and verify the reported curl
+        run: |
+          [[ "$IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          api="$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA"
+          context="lab3/mac-deploy/$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT"
+          headers=(-H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json")
+          payload=$(jq -nc --arg context "$context" --arg digest "$IMAGE_DIGEST" \
+            '{state:"pending",context:$context,description:$digest}')
+          curl -fsS --max-time 15 "${headers[@]}" -H 'Content-Type: application/json' \
+            --data "$payload" "$api" >/dev/null
+          echo "Waiting for the Mac deployment of $IMAGE_TAG ($IMAGE_DIGEST)"
+
+          for attempt in {1..60}; do
+            result=$(curl -fsS --max-time 15 "${headers[@]}" "$api" |
+              jq -c --arg context "$context" 'first(.[] | select(.context == $context)) // {}')
+            state=$(jq -r '.state // ""' <<< "$result")
+            case "$state" in
+              success)
+                probe=$(jq -er '.description | select(startswith("HTTP 200 /api/health "))' <<< "$result")
+                printf 'DEPLOYED_TAG=%s\n%s\n' "$IMAGE_TAG" "$probe"
+                exit 0
+                ;;
+              failure|error)
+                jq -r '.description' <<< "$result"
+                exit 1
+                ;;
+            esac
+            sleep 10
+          done
+          echo "No successful deployment response from the Mac. Check that deploy_local.py is running."
+          exit 1

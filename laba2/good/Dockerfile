@@ -1,7 +1,10 @@
 # Лаба 2: хороший образ приложения "Заметки"
 # Этап 1. Устанавливаем зависимости в отдельное виртуальное окружение.
 # Версия Python и дистрибутив указаны явно, без latest.
-FROM python:3.13.15-slim-bookworm AS builder
+# Базовый образ для обеих стадий. В CI его можно переопределить для сравнения результатов Trivy.
+ARG PYTHON_BASE=python:3.13.18-slim-bookworm
+
+FROM ${PYTHON_BASE} AS builder
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1
@@ -15,7 +18,7 @@ COPY requirements.txt ./
 RUN pip install -r requirements.txt
 
 # Этап 2. Маленький образ для запуска — без файлов сборки.
-FROM python:3.13.15-slim-bookworm AS runtime
+FROM ${PYTHON_BASE} AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
