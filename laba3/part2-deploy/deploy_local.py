@@ -89,7 +89,14 @@ def deploy(username, token, password, digest):
         credentials = base64.b64encode(f"{username}:{token}".encode()).decode()
         config_file = Path(config) / "config.json"
         config_file.touch(mode=0o600)
-        config_file.write_text(json.dumps({"auths": {"ghcr.io": {"auth": credentials}}}))
+        # Docker needs its normal plugin directory even with temporary registry credentials.
+        client_config = Path(os.environ.get("DOCKER_CONFIG") or Path.home() / ".docker").expanduser()
+        config_file.write_text(
+            json.dumps({
+                "auths": {"ghcr.io": {"auth": credentials}},
+                "cliPluginsExtraDirs": [str((client_config / "cli-plugins").resolve())],
+            })
+        )
         env = os.environ.copy()
         env.pop("DOCKER_CONTEXT", None)
         env.update(
