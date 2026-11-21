@@ -62,7 +62,7 @@ def wait_for_request(commit, token):
                 and re.fullmatch(r"sha256:[0-9a-f]{64}", digest)
             ):
                 run_id, attempt = run_match.groups()
-                run = github(f"/actions/runs/{run_id}")
+                run = github(f"/actions/runs/{run_id}", token)
                 if (
                     run["status"] == "in_progress"
                     and run["event"] == "push"
