@@ -83,7 +83,7 @@ def deploy(username, token, password, digest):
         ["docker", "context", "inspect", "--format", '{{ (index .Endpoints "docker").Host }}'],
         text=True,
     ).strip()
-    if not docker_host.startswith("unix://"):
+    if not docker_host.startswith(("unix://", "npipe://")):
         raise RuntimeError("Select the local Docker Desktop context before deployment.")
 
     with tempfile.TemporaryDirectory() as config:
@@ -118,8 +118,9 @@ def deploy(username, token, password, digest):
         )
         subprocess.run([*compose, "ps"], env=env, check=True)
 
+    curl = "curl.exe" if os.name == "nt" else "curl"
     response = subprocess.check_output(
-        ["curl", "-fsS", "-i", "--max-time", "10", "http://127.0.0.1:18080/api/health"],
+        [curl, "-fsS", "-i", "--max-time", "10", "http://127.0.0.1:18080/api/health"],
         text=True,
     )
     print(response, end="" if response.endswith("\n") else "\n", flush=True)
@@ -138,7 +139,8 @@ def main():
     password = getpass.getpass("Password of the local PostgreSQL volume (input hidden): ")
     if not all((username, token, password)):
         raise SystemExit("GitHub login, token and PostgreSQL password are required.")
-        state_file = Path.home() / ".notes-lab3-last-good.json"
+
+    state_file = Path.home() / ".notes-lab3-last-good.json"
 
     if sys.argv[1:] == ["rollback"]:
         started = time.monotonic()
