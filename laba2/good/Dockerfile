@@ -2,7 +2,7 @@
 # Этап 1. Устанавливаем зависимости в отдельное виртуальное окружение.
 # Версия Python и дистрибутив указаны явно, без latest.
 # Базовый образ для обеих стадий. В CI его можно переопределить для сравнения результатов Trivy.
-ARG PYTHON_BASE=python:3.13.18-slim-bookworm
+ARG PYTHON_BASE=python:3.13.18-slim-trixie
 
 FROM ${PYTHON_BASE} AS builder
 
