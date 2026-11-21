@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
 import tempfile
 import time
 from urllib.error import URLError
@@ -137,6 +138,17 @@ def main():
     password = getpass.getpass("Password of the local PostgreSQL volume (input hidden): ")
     if not all((username, token, password)):
         raise SystemExit("GitHub login, token and PostgreSQL password are required.")
+        state_file = Path.home() / ".notes-lab3-last-good.json"
+
+    if sys.argv[1:] == ["rollback"]:
+        started = time.monotonic()
+        if not state_file.exists():
+            raise SystemExit("Сначала запусти рабочую версию.")
+        saved = json.loads(state_file.read_text(encoding="utf-8"))
+        print(f"Возвращаю {saved['tag']} ({saved['digest']})", flush=True)
+        deploy(username, token, password, saved["digest"])
+        print(f"Откат занял {time.monotonic() - started:.2f} с")
+        return    
     context, digest = wait_for_request(commit, token)
     if github("/branches/main", token)["commit"]["sha"] != commit:
         # A newer push superseded this request.
@@ -153,6 +165,10 @@ def main():
             {"state": "failure", "context": context, "description": "Deploy or curl failed on the Mac"},
         )
         raise SystemExit(f"Deploy or curl failed on the Mac: {type(error).__name__}") from error
+    state_file.write_text(
+        json.dumps({"tag": f"{IMAGE}:{commit}", "digest": digest}),
+        encoding="utf-8",
+    )    
     github(f"/statuses/{commit}", token, {"state": "success", "context": context, "description": health})
     print(f"DEPLOYED_TAG={IMAGE}:{commit}\nResult sent to GitHub.", flush=True)
 
